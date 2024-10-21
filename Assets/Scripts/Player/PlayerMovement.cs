@@ -97,7 +97,6 @@ public class PlayerMovementAdvanced : MonoBehaviour
     {
         MovePlayer();
     }
-
     private void MyInput()
     {
         // Use custom key bindings for movement
