@@ -1,13 +1,9 @@
 using System.Collections;
-
 using System.Collections.Generic;
 using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 
-
-
 public class PlayerCam : MonoBehaviour
-
 {
     public float sensX;
     public float sensY;
@@ -21,16 +17,12 @@ public class PlayerCam : MonoBehaviour
     float yRotation;
 
     private void Start()
-
     {
-
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
-
     }
     
     private void LateUpdate()
-
     {
         transform.position = cameraPosition.position;
 
@@ -45,8 +37,6 @@ public class PlayerCam : MonoBehaviour
 
         transform.rotation = Quaternion.Euler(xRotation, yRotation, 0f);
         orientation.rotation = Quaternion.Euler(0f, yRotation, 0f);
-        
-
     }
 
 }
