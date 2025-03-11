@@ -4,26 +4,16 @@ using UnityEngine;
 
 public class Player : MonoBehaviour
 {
-    //Player Variables
-
-    void Update()
+    // Cache components
+    private Camera mainCamera;
+   
+    private void Awake()
     {
-        if (Input.GetKeyDown(KeyCode.E)) PlayerInteract();
-    }
-
-    public void PlayerInteract()
-    {
-        var layermask0 = 1 << 0;
-        var layermask3 = 1 << 3;
-        var finalmask = layermask0 | layermask3;
-
-        RaycastHit hit;
-        Ray ray = Camera.main.ViewportPointToRay(new Vector3(.5f, .5f, 0));
-
-        if (Physics.Raycast(ray, out hit, 15, finalmask))
+        mainCamera = Camera.main;
+       
+        if (!mainCamera)
         {
-            Interact interactScript = hit.transform.GetComponent<Interact>();
-            if (interactScript) interactScript.CallInteract(this);
+            Debug.LogError("Main Camera not found!");
         }
     }
 }
