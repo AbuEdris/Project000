@@ -1,241 +1,139 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 
-public class PlayerMovementAdvanced : MonoBehaviour
+[RequireComponent(typeof(Rigidbody))]
+public class JackMovementController : MonoBehaviour
 {
-    [Header("Movement")]
-    private float moveSpeed;
-    public float walkSpeed;
-    public float sprintSpeed;
+    [Header("Movement Settings")]
+    public Transform orientation;
+    public float walkSpeed = 5f;
+    public float sprintSpeed = 7f;
+    public float crouchSpeed = 2.5f;
+    public float airMultiplier = 0.4f;
+    [SerializeField] private float currentSpeed;
 
-    public float groundDrag;
+    [Header("Jump Settings")]
+    public float jumpForce = 7f;
+    public float jumpCooldown = 0.25f;
+    public float gravityMultiplier = 1.5f;
+    private bool readyToJump = true;
 
-    [Header("Jumping")]
-    public float jumpForce;
-    public float jumpCooldown;
-    public float airMultiplier;
-    bool readyToJump;
-
-    [Header("Crouching")]
-    public float crouchSpeed;
-    public float crouchYScale;
-    private float startYScale;
-
-    [Header("Keybinds")]
-    // Movement key bindings
-    public KeyCode moveUpKey = KeyCode.W;
-    public KeyCode moveDownKey = KeyCode.S;
-    public KeyCode moveLeftKey = KeyCode.A;
-    public KeyCode moveRightKey = KeyCode.D;
-    public KeyCode jumpKey = KeyCode.Space;
-    public KeyCode sprintKey = KeyCode.LeftShift;
-    public KeyCode crouchKey = KeyCode.LeftControl;
-
-    // Number key bindings
-    public KeyCode action1Key = KeyCode.Alpha1;
-    public KeyCode action2Key = KeyCode.Alpha2;
-    public KeyCode action3Key = KeyCode.Alpha3;
-    public KeyCode action4Key = KeyCode.Alpha4;
+    [Header("State Management")]
+    public MentalState currentState;
+    public float mentalStability = 100f;
+    public float maxMentalStability = 100f;
+    public TextMeshProUGUI stateDisplay;
 
     [Header("Ground Check")]
-    public float playerHeight;
-    public LayerMask whatIsGround;
-    bool grounded;
+    public LayerMask groundLayer;
+    public float groundCheckDistance = 0.4f;
+    public float playerHeight = 2f;
+    private bool grounded;
 
-    [Header("Slope Handling")]
-    public float maxSlopeAngle;
-    private RaycastHit slopeHit;
-    private bool exitingSlope;
+    private Rigidbody rb;
+    private Vector3 moveDirection;
+    private float horizontalInput;
+    private float verticalInput;
+    private bool isCrouching;
 
-    public Transform orientation;
-
-    float horizontalInput;
-    float verticalInput;
-
-    Vector3 moveDirection;
-
-    Rigidbody rb;
-
-    public MovementState state;
-    public enum MovementState
+    public enum MentalState
     {
-        walking,
-        sprinting,
-        crouching,
-        air
+        Stable,
+        Unstable,
+        Dreaming,
+        Psychotic
+    }
+
+    private void Awake()
+    {
+        rb = GetComponent<Rigidbody>();
+        if (orientation == null)
+        {
+            Debug.LogWarning("Orientation not assigned - using player transform");
+            orientation = transform;
+        }
     }
 
     private void Start()
     {
-        rb = GetComponent<Rigidbody>();
         rb.freezeRotation = true;
-
-        readyToJump = true;
-
-        startYScale = transform.localScale.y;
+        ResetJump();
+        currentState = MentalState.Stable;
+        UpdateStateDisplay();
     }
 
     private void Update()
     {
-        // Ground check
-        grounded = Physics.Raycast(transform.position, Vector3.down, playerHeight * 0.5f + 0.2f, whatIsGround);
-
-        MyInput();
+        GetInput();
+        GroundCheck();
         SpeedControl();
-        StateHandler();
-
-        // Handle drag
-        if (grounded)
-            rb.linearDamping = groundDrag;
-        else
-            rb.linearDamping = 0;
+        HandleDrag();
+        UpdateMentalState();
     }
 
     private void FixedUpdate()
     {
         MovePlayer();
     }
-    private void MyInput()
+
+    private void GetInput()
     {
-        // Use custom key bindings for movement
-        horizontalInput = 0;
-        verticalInput = 0;
+        horizontalInput = Input.GetAxisRaw("Horizontal");
+        verticalInput = Input.GetAxisRaw("Vertical");
 
-        if (Input.GetKey(moveLeftKey)) horizontalInput = -1;
-        if (Input.GetKey(moveRightKey)) horizontalInput = 1;
-        if (Input.GetKey(moveDownKey)) verticalInput = -1;
-        if (Input.GetKey(moveUpKey)) verticalInput = 1;
-
-        // When to jump
-        if (Input.GetKey(jumpKey) && readyToJump && grounded)
+        if (Input.GetKey(KeyCode.Space) && readyToJump && grounded)
         {
             readyToJump = false;
             Jump();
             Invoke(nameof(ResetJump), jumpCooldown);
         }
 
-        // Start crouch
-        if (Input.GetKeyDown(crouchKey))
-        {
-            transform.localScale = new Vector3(transform.localScale.x, crouchYScale, transform.localScale.z);
-            rb.AddForce(Vector3.down * 5f, ForceMode.Impulse);
-        }
-
-        // Stop crouch
-        if (Input.GetKeyUp(crouchKey))
-        {
-            transform.localScale = new Vector3(transform.localScale.x, startYScale, transform.localScale.z);
-        }
-
-        // Handle number key actions
-        if (Input.GetKeyDown(action1Key)) Action1();
-        if (Input.GetKeyDown(action2Key)) Action2();
-        if (Input.GetKeyDown(action3Key)) Action3();
-        if (Input.GetKeyDown(action4Key)) Action4();
-    }
-
-    private void Action1()
-    {
-        // Define action for key 1
-        Debug.Log("Action 1 performed!");
-    }
-
-    private void Action2()
-    {
-        // Define action for key 2
-        Debug.Log("Action 2 performed!");
-    }
-
-    private void Action3()
-    {
-        // Define action for key 3
-        Debug.Log("Action 3 performed!");
-    }
-
-    private void Action4()
-    {
-        // Define action for key 4
-        Debug.Log("Action 4 performed!");
-    }
-
-    private void StateHandler()
-    {
-        // Mode - Crouching
-        if (Input.GetKey(crouchKey))
-        {
-            state = MovementState.crouching;
-            moveSpeed = crouchSpeed;
-        }
-        // Mode - Sprinting
-        else if (grounded && Input.GetKey(sprintKey))
-        {
-            state = MovementState.sprinting;
-            moveSpeed = sprintSpeed;
-        }
-        // Mode - Walking
-        else if (grounded)
-        {
-            state = MovementState.walking;
-            moveSpeed = walkSpeed;
-        }
-        // Mode - Air
-        else
-        {
-            state = MovementState.air;
-        }
+        if (Input.GetKeyDown(KeyCode.LeftControl)) ToggleCrouch();
     }
 
     private void MovePlayer()
     {
-        // Calculate movement direction
+        if (orientation == null) return;
+
         moveDirection = orientation.forward * verticalInput + orientation.right * horizontalInput;
 
-        // On slope
-        if (OnSlope() && !exitingSlope)
-        {
-            rb.AddForce(GetSlopeMoveDirection() * moveSpeed * 20f, ForceMode.Force);
-            if (rb.linearVelocity.y > 0)
-                rb.AddForce(Vector3.down * 80f, ForceMode.Force);
-        }
-        // On ground
-        else if (grounded)
-            rb.AddForce(moveDirection.normalized * moveSpeed * 10f, ForceMode.Force);
-        // In air
-        else if (!grounded)
-            rb.AddForce(moveDirection.normalized * moveSpeed * 10f * airMultiplier, ForceMode.Force);
+        float speedMultiplier = grounded ? 10f : 10f * airMultiplier;
+        
+        if (isCrouching)
+            rb.AddForce(moveDirection.normalized * crouchSpeed * speedMultiplier, ForceMode.Force);
+        else if (Input.GetKey(KeyCode.LeftShift))
+            rb.AddForce(moveDirection.normalized * sprintSpeed * speedMultiplier, ForceMode.Force);
+        else
+            rb.AddForce(moveDirection.normalized * walkSpeed * speedMultiplier, ForceMode.Force);
 
-        // Turn gravity off while on slope
-        rb.useGravity = !OnSlope();
+        // Apply additional gravity
+        rb.AddForce(Physics.gravity * gravityMultiplier, ForceMode.Acceleration);
+    }
+
+    private void GroundCheck()
+    {
+        grounded = Physics.Raycast(transform.position, Vector3.down, playerHeight * 0.5f + groundCheckDistance, groundLayer);
+        Debug.DrawRay(transform.position, Vector3.down * (playerHeight * 0.5f + groundCheckDistance), grounded ? Color.green : Color.red);
     }
 
     private void SpeedControl()
     {
-        // Limiting speed on slope
-        if (OnSlope() && !exitingSlope)
+        Vector3 flatVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+
+        float maxSpeed = isCrouching ? crouchSpeed : 
+                        Input.GetKey(KeyCode.LeftShift) ? sprintSpeed : 
+                        walkSpeed;
+
+        if (flatVelocity.magnitude > maxSpeed)
         {
-            if (rb.linearVelocity.magnitude > moveSpeed)
-                rb.linearVelocity = rb.linearVelocity.normalized * moveSpeed;
-        }
-        // Limiting speed on ground or in air
-        else
-        {
-            Vector3 flatVel = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
-            // Limit velocity if needed
-            if (flatVel.magnitude > moveSpeed)
-            {
-                Vector3 limitedVel = flatVel.normalized * moveSpeed;
-                rb.linearVelocity = new Vector3(limitedVel.x, rb.linearVelocity.y, limitedVel.z);
-            }
+            Vector3 limitedVelocity = flatVelocity.normalized * maxSpeed;
+            rb.linearVelocity = new Vector3(limitedVelocity.x, rb.linearVelocity.y, limitedVelocity.z);
         }
     }
 
     private void Jump()
     {
-        exitingSlope = true;
-
-        // Reset y velocity
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         rb.AddForce(transform.up * jumpForce, ForceMode.Impulse);
     }
@@ -243,21 +141,60 @@ public class PlayerMovementAdvanced : MonoBehaviour
     private void ResetJump()
     {
         readyToJump = true;
-        exitingSlope = false;
     }
 
-    private bool OnSlope()
+    private void ToggleCrouch()
     {
-        if (Physics.Raycast(transform.position, Vector3.down, out slopeHit, playerHeight * 0.5f + 0.3f))
+        isCrouching = !isCrouching;
+        float newHeight = isCrouching ? playerHeight * 0.5f : playerHeight;
+        transform.localScale = new Vector3(transform.localScale.x, newHeight, transform.localScale.z);
+    }
+
+    private void HandleDrag()
+    {
+        rb.linearDamping = grounded ? 5f : 0f;
+    }
+
+    private void UpdateMentalState()
+    {
+        // State transitions based on stability
+        if (mentalStability > 70f) currentState = MentalState.Stable;
+        else if (mentalStability > 40f) currentState = MentalState.Unstable;
+        else if (mentalStability > 10f) currentState = MentalState.Dreaming;
+        else currentState = MentalState.Psychotic;
+
+        // Adjust movement based on state
+        switch (currentState)
         {
-            float angle = Vector3.Angle(Vector3.up, slopeHit.normal);
-            return angle < maxSlopeAngle && angle != 0;
+            case MentalState.Stable:
+                walkSpeed = 5f;
+                break;
+            case MentalState.Unstable:
+                walkSpeed = 4f;
+                break;
+            case MentalState.Dreaming:
+                walkSpeed = 3.5f;
+                airMultiplier = 0.6f;
+                break;
+            case MentalState.Psychotic:
+                walkSpeed = 6f;
+                airMultiplier = 0.2f;
+                break;
         }
-        return false;
+
+        UpdateStateDisplay();
     }
 
-    private Vector3 GetSlopeMoveDirection()
+    private void UpdateStateDisplay()
     {
-        return Vector3.ProjectOnPlane(moveDirection, slopeHit.normal).normalized;
+        if (stateDisplay != null)
+            stateDisplay.text = $"State: {currentState}\nStability: {mentalStability:F0}%";
     }
+
+    public void ModifyStability(float amount)
+    {
+        mentalStability = Mathf.Clamp(mentalStability + amount, 0f, maxMentalStability);
+    }
+
+    // Add other systems (interactions, effects, etc) below...
 }
