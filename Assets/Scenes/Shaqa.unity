@@ -132,6 +132,7 @@ GameObject:
   - component: {fileID: 29406733}
   - component: {fileID: 29406732}
   - component: {fileID: 29406731}
+  - component: {fileID: 29406734}
   m_Layer: 0
   m_Name: PlayerBody
   m_TagString: Player
@@ -253,6 +254,31 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!143 &29406734
+CharacterController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 29406728}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Height: 2
+  m_Radius: 0.5
+  m_SlopeLimit: 45
+  m_StepOffset: 0.3
+  m_SkinWidth: 0.08
+  m_MinMoveDistance: 0.001
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &157207112
 GameObject:
   m_ObjectHideFlags: 0
@@ -676,7 +702,7 @@ Transform:
   m_GameObject: {fileID: 545660240}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.24771634, y: -1.3299999, z: -0.16297114}
+  m_LocalPosition: {x: 0.255, y: -1.433, z: -0.2}
   m_LocalScale: {x: 1.4541435, y: 1, z: 1.4541435}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -724,8 +750,8 @@ GameObject:
   - component: {fileID: 1122555477}
   - component: {fileID: 1122555481}
   - component: {fileID: 1122555478}
-  - component: {fileID: 1122555479}
   - component: {fileID: 1122555480}
+  - component: {fileID: 1122555482}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -742,7 +768,7 @@ Transform:
   m_GameObject: {fileID: 1122555473}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 18.48, y: 0.19, z: -24.27}
+  m_LocalPosition: {x: 18.48, y: 0.19, z: -25.51}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -761,46 +787,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b8b40406dcc31fb4392a678a90305acb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveSpeed: 7.5
+  moveSpeed: 6.5
   groundDrag: 6.5
   jumpForce: 12
   jumpCooldown: 0.5
   airMultiplier: 0.3
-  crouchSpeed: 3.5
-  crouchYScale: 0.5
   playerHeight: 2
   whatIsGround:
     serializedVersion: 2
     m_Bits: 8
-  maxSlopeAngle: 45
   orientation: {fileID: 545660241}
---- !u!54 &1122555479
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1122555473}
-  serializedVersion: 4
-  m_Mass: 1.5
-  m_Drag: 0
-  m_AngularDrag: 0.075
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
-  m_Interpolate: 1
-  m_Constraints: 112
-  m_CollisionDetection: 1
 --- !u!114 &1122555480
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -829,7 +825,7 @@ CharacterController:
     m_Bits: 0
   m_LayerOverridePriority: 0
   m_ProvidesContacts: 0
-  m_Enabled: 0
+  m_Enabled: 1
   serializedVersion: 3
   m_Height: 2
   m_Radius: 0.5
@@ -838,6 +834,33 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: -17.5, y: 1, z: 23.2}
+--- !u!54 &1122555482
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1122555473}
+  serializedVersion: 4
+  m_Mass: 1
+  m_Drag: 0
+  m_AngularDrag: 0.075
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 1
+  m_Constraints: 112
+  m_CollisionDetection: 1
 --- !u!1 &1566770676
 GameObject:
   m_ObjectHideFlags: 0
