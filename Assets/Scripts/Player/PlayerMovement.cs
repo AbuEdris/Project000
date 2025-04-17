@@ -1,75 +1,78 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
-using TMPro;
 
-[RequireComponent(typeof(Rigidbody))]
-public class JackMovementController : MonoBehaviour
+public class SimplifiedMovementController : MonoBehaviour
 {
-    [Header("Movement Settings")]
-    public Transform orientation;
-    public float walkSpeed = 5f;
-    public float sprintSpeed = 7f;
-    public float crouchSpeed = 2.5f;
-    public float airMultiplier = 0.4f;
-    [SerializeField] private float currentSpeed;
+    [Header("Movement")]
+    public float moveSpeed = 7f;
+    public float groundDrag = 5f;
 
-    [Header("Jump Settings")]
-    public float jumpForce = 7f;
+    [Header("Jumping")]
+    public float jumpForce = 12f;
     public float jumpCooldown = 0.25f;
-    public float gravityMultiplier = 1.5f;
-    private bool readyToJump = true;
+    public float airMultiplier = 0.4f;
+    bool readyToJump = true;
+    private float jumpCooldownTimer = 0f;
 
-    [Header("State Management")]
-    public MentalState currentState;
-    public float mentalStability = 100f;
-    public float maxMentalStability = 100f;
-    public TextMeshProUGUI stateDisplay;
+    [Header("Crouching")]
+    public float crouchSpeed = 3.5f;
+    public float crouchYScale = 0.5f;
+    private float startYScale;
 
     [Header("Ground Check")]
-    public LayerMask groundLayer;
-    public float groundCheckDistance = 0.4f;
     public float playerHeight = 2f;
-    private bool grounded;
+    public LayerMask whatIsGround;
+    bool grounded;
 
-    private Rigidbody rb;
-    private Vector3 moveDirection;
-    private float horizontalInput;
-    private float verticalInput;
-    private bool isCrouching;
+    [Header("Slope Handling")]
+    public float maxSlopeAngle = 40f;
+    private RaycastHit slopeHit;
+    private bool exitingSlope;
 
-    public enum MentalState
-    {
-        Stable,
-        Unstable,
-        Dreaming,
-        Psychotic
-    }
+    public Transform orientation;
 
-    private void Awake()
-    {
-        rb = GetComponent<Rigidbody>();
-        if (orientation == null)
-        {
-            Debug.LogWarning("Orientation not assigned - using player transform");
-            orientation = transform;
-        }
-    }
+    float horizontalInput;
+    float verticalInput;
+
+    Vector3 moveDirection;
+
+    Rigidbody rb;
 
     private void Start()
     {
+        rb = GetComponent<Rigidbody>();
         rb.freezeRotation = true;
-        ResetJump();
-        currentState = MentalState.Stable;
-        UpdateStateDisplay();
+
+        readyToJump = true;
+        startYScale = transform.localScale.y;
     }
 
     private void Update()
     {
-        GetInput();
-        GroundCheck();
+        // Ground check
+        grounded = Physics.Raycast(transform.position, Vector3.down, playerHeight * 0.5f + 0.2f, whatIsGround);
+
+        // Process player input
+        MyInput();
         SpeedControl();
-        HandleDrag();
-        UpdateMentalState();
+
+        // Handle drag
+        if (grounded)
+            rb.linearDamping = groundDrag;
+        else
+            rb.linearDamping = 0;
+            
+        // Handle jump cooldown
+        if (!readyToJump)
+        {
+            jumpCooldownTimer -= Time.deltaTime;
+            if (jumpCooldownTimer <= 0)
+            {
+                readyToJump = true;
+                exitingSlope = false;
+            }
+        }
     }
 
     private void FixedUpdate()
@@ -77,124 +80,104 @@ public class JackMovementController : MonoBehaviour
         MovePlayer();
     }
 
-    private void GetInput()
+    private void MyInput()
     {
-        horizontalInput = Input.GetAxisRaw("Horizontal");
-        verticalInput = Input.GetAxisRaw("Vertical");
+        // Use direct key checks for WASD
+        horizontalInput = 0;
+        verticalInput = 0;
 
+        if (Input.GetKey(KeyCode.W)) verticalInput += 1f;
+        if (Input.GetKey(KeyCode.S)) verticalInput -= 1f;
+        if (Input.GetKey(KeyCode.A)) horizontalInput -= 1f;
+        if (Input.GetKey(KeyCode.D)) horizontalInput += 1f;
+
+        // When to jump
         if (Input.GetKey(KeyCode.Space) && readyToJump && grounded)
         {
             readyToJump = false;
+            jumpCooldownTimer = jumpCooldown;
             Jump();
-            Invoke(nameof(ResetJump), jumpCooldown);
         }
 
-        if (Input.GetKeyDown(KeyCode.LeftControl)) ToggleCrouch();
+        // Start crouch
+        if (Input.GetKeyDown(KeyCode.LeftControl))
+        {
+            transform.localScale = new Vector3(transform.localScale.x, crouchYScale, transform.localScale.z);
+            rb.AddForce(Vector3.down * 5f, ForceMode.Impulse);
+        }
+
+        // Stop crouch
+        if (Input.GetKeyUp(KeyCode.LeftControl))
+        {
+            transform.localScale = new Vector3(transform.localScale.x, startYScale, transform.localScale.z);
+        }
     }
 
     private void MovePlayer()
     {
-        if (orientation == null) return;
-
+        // Calculate movement direction
         moveDirection = orientation.forward * verticalInput + orientation.right * horizontalInput;
 
-        float speedMultiplier = grounded ? 10f : 10f * airMultiplier;
-        
-        if (isCrouching)
-            rb.AddForce(moveDirection.normalized * crouchSpeed * speedMultiplier, ForceMode.Force);
-        else if (Input.GetKey(KeyCode.LeftShift))
-            rb.AddForce(moveDirection.normalized * sprintSpeed * speedMultiplier, ForceMode.Force);
-        else
-            rb.AddForce(moveDirection.normalized * walkSpeed * speedMultiplier, ForceMode.Force);
+        // On slope
+        if (OnSlope() && !exitingSlope)
+        {
+            rb.AddForce(GetSlopeMoveDirection() * moveSpeed * 20f, ForceMode.Force);
+            if (rb.linearVelocity.y > 0)
+                rb.AddForce(Vector3.down * 80f, ForceMode.Force);
+        }
+        // On ground
+        else if (grounded)
+            rb.AddForce(moveDirection.normalized * moveSpeed * 10f, ForceMode.Force);
+        // In air
+        else if (!grounded)
+            rb.AddForce(moveDirection.normalized * moveSpeed * 10f * airMultiplier, ForceMode.Force);
 
-        // Apply additional gravity
-        rb.AddForce(Physics.gravity * gravityMultiplier, ForceMode.Acceleration);
-    }
-
-    private void GroundCheck()
-    {
-        grounded = Physics.Raycast(transform.position, Vector3.down, playerHeight * 0.5f + groundCheckDistance, groundLayer);
-        Debug.DrawRay(transform.position, Vector3.down * (playerHeight * 0.5f + groundCheckDistance), grounded ? Color.green : Color.red);
+        // Turn gravity off while on slope
+        rb.useGravity = !OnSlope();
     }
 
     private void SpeedControl()
     {
-        Vector3 flatVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
-
-        float maxSpeed = isCrouching ? crouchSpeed : 
-                        Input.GetKey(KeyCode.LeftShift) ? sprintSpeed : 
-                        walkSpeed;
-
-        if (flatVelocity.magnitude > maxSpeed)
+        // Limiting speed on slope
+        if (OnSlope() && !exitingSlope)
         {
-            Vector3 limitedVelocity = flatVelocity.normalized * maxSpeed;
-            rb.linearVelocity = new Vector3(limitedVelocity.x, rb.linearVelocity.y, limitedVelocity.z);
+            if (rb.linearVelocity.magnitude > moveSpeed)
+                rb.linearVelocity = rb.linearVelocity.normalized * moveSpeed;
+        }
+        // Limiting speed on ground or in air
+        else
+        {
+            Vector3 flatVel = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
+            // Limit velocity if needed
+            if (flatVel.magnitude > moveSpeed)
+            {
+                Vector3 limitedVel = flatVel.normalized * moveSpeed;
+                rb.linearVelocity = new Vector3(limitedVel.x, rb.linearVelocity.y, limitedVel.z);
+            }
         }
     }
 
     private void Jump()
     {
+        exitingSlope = true;
+
+        // Reset y velocity
         rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
         rb.AddForce(transform.up * jumpForce, ForceMode.Impulse);
     }
 
-    private void ResetJump()
+    private bool OnSlope()
     {
-        readyToJump = true;
-    }
-
-    private void ToggleCrouch()
-    {
-        isCrouching = !isCrouching;
-        float newHeight = isCrouching ? playerHeight * 0.5f : playerHeight;
-        transform.localScale = new Vector3(transform.localScale.x, newHeight, transform.localScale.z);
-    }
-
-    private void HandleDrag()
-    {
-        rb.linearDamping = grounded ? 5f : 0f;
-    }
-
-    private void UpdateMentalState()
-    {
-        // State transitions based on stability
-        if (mentalStability > 70f) currentState = MentalState.Stable;
-        else if (mentalStability > 40f) currentState = MentalState.Unstable;
-        else if (mentalStability > 10f) currentState = MentalState.Dreaming;
-        else currentState = MentalState.Psychotic;
-
-        // Adjust movement based on state
-        switch (currentState)
+        if (Physics.Raycast(transform.position, Vector3.down, out slopeHit, playerHeight * 0.5f + 0.3f))
         {
-            case MentalState.Stable:
-                walkSpeed = 5f;
-                break;
-            case MentalState.Unstable:
-                walkSpeed = 4f;
-                break;
-            case MentalState.Dreaming:
-                walkSpeed = 3.5f;
-                airMultiplier = 0.6f;
-                break;
-            case MentalState.Psychotic:
-                walkSpeed = 6f;
-                airMultiplier = 0.2f;
-                break;
+            float angle = Vector3.Angle(Vector3.up, slopeHit.normal);
+            return angle < maxSlopeAngle && angle != 0;
         }
-
-        UpdateStateDisplay();
+        return false;
     }
 
-    private void UpdateStateDisplay()
+    private Vector3 GetSlopeMoveDirection()
     {
-        if (stateDisplay != null)
-            stateDisplay.text = $"State: {currentState}\nStability: {mentalStability:F0}%";
+        return Vector3.ProjectOnPlane(moveDirection, slopeHit.normal).normalized;
     }
-
-    public void ModifyStability(float amount)
-    {
-        mentalStability = Mathf.Clamp(mentalStability + amount, 0f, maxMentalStability);
-    }
-
-    // Add other systems (interactions, effects, etc) below...
 }
