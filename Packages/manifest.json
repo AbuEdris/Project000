@@ -10,6 +10,8 @@
     "com.unity.progrids": "3.0.3-preview.6",
     "com.unity.render-pipelines.high-definition": "17.0.4",
     "com.unity.render-pipelines.high-definition-config": "17.0.4",
+    "com.unity.render-pipelines.universal": "17.0.4",
+    "com.unity.terrain-tools": "5.1.2",
     "com.unity.timeline": "1.8.8",
     "com.unity.ugui": "2.0.0",
     "com.unity.visualscripting": "1.9.5",
